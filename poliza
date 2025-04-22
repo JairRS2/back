@@ -1,0 +1,149 @@
+string strPolizaDiario = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=\\\\srv2kas\\Base Deposito Polizas\\PolizasDiarioLP.mdb;Jet OLEDB:Database Password=a9TnX13HHOo;";
+string strProveedores = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=\\\\srv2kas\\Base Datos Proveedores_R\\ProveedoresLP.mdb;";
+string strTesoreria = "Provider=Microsoft.ACE.OLEDB.12.0;Data Source=\\\\srv2kas\\Base Datos Administra_R\\TesoreriaLP.mdb;Jet OLEDB:Database Password=a9TnX13HHOo;";
+
+private bool GenerarPoliza()
+{
+    bool bExistePoliza = false;
+    try
+    {
+        int nPolPol = UltimaPoliza();
+        int nTipPol = 3;
+        string cConPol = "COMPRA DE UREA";
+        decimal nDebPol = Convert.ToDecimal(txtTotal.Text);
+        decimal nHabPol = Convert.ToDecimal(txtTotal.Text);
+        string cAfePol = "NO";
+        int nEmpPol = 2;
+        int nContPol = 0;
+        int nEdoPol = 0;
+        int nOriPol = 2;
+        
+        int nNumOrd = Convert.ToInt32(txtNumero.Text);
+
+        //Inserta poliza
+        using (OleDbConnection connectionPol = new OleDbConnection(strPolizaDiario))
+        {
+            connectionPol.Open();
+
+            string SQLPoliza = "Insert Into POLIG2 (nPolPol, nTipPol, cConPol, nDebPol, nHabPol, dFecPol, cAfePol, nEmpPol, nContPol, nEdoPol, nOriPol) " +
+                                "Values (" + nPolPol + "," + nTipPol + ",'" + cConPol + "'," + nDebPol + "," + nHabPol + ",#" + DateTime.Now.ToString("MM-dd-yyyy") + "#,'" + cAfePol + "'," + nEmpPol + "," + nContPol + "," + nEdoPol + "," + nOriPol + ")";
+
+            OleDbCommand commandPoliza = new OleDbCommand(SQLPoliza, connectionPol);
+
+            commandPoliza.ExecuteNonQuery();
+
+            connectionPol.Close();
+        }
+
+        using (OleDbConnection connectionPolValida = new OleDbConnection(strPolizaDiario))
+        {
+            connectionPolValida.Open();                    
+
+            DataTable dtPoliza = new DataTable();
+            string SQLPoliza = "SELECT nPolPol FROM POLIG2 WHERE nPolPol = " + nPolPol;
+
+            OleDbCommand commandPoliza = new OleDbCommand(SQLPoliza, connectionPolValida);
+
+            OleDbDataReader readerPoliza = commandPoliza.ExecuteReader();
+
+            dtPoliza.Load(readerPoliza);
+
+            if (dtPoliza.Rows.Count > 0)
+            {
+                bExistePoliza = true;
+                //Actualiza la columna de poliza
+                SQL = "UPDATE dbUrea.dbo.tbOrden SET nPolPol = " + nPolPol + " WHERE nNumOrd = " + nNumOrd + "; ";
+                bool binserPolOrden = conexComprasUrea.ejecSql(SQL);
+
+                if (!binserPolOrden)
+                {
+                    connectionPolValida.Close();
+                    MessageBox.Show("Error, no se inserto la poliza en orden de compra");
+                    return bExistePoliza = false;
+                }
+
+                // Para InventarioUreaDebe
+                bool bInventarioUreaDebe = InsertarPolizaDetalle(nPolPol, "1105012000", Convert.ToDecimal(txtSubtotal.Text), 0, 0);
+
+                // Para IvaUreaDebe
+                bool bIvaUreaDebe = InsertarPolizaDetalle(nPolPol, "1107002000", Convert.ToDecimal(txtIva.Text), 0, 1);
+
+                // Para ProveedorUreaHaber
+                bool bProveedorUreaHaber = InsertarPolizaDetalle(nPolPol, "2102040000", 0, Convert.ToDecimal(txtTotal.Text), 2);
+
+                if (!bInventarioUreaDebe || !bIvaUreaDebe || !bProveedorUreaHaber)
+                {
+                    connectionPolValida.Close();
+                    MessageBox.Show("Error, no se inserto detalle de la poliza");
+                    return bExistePoliza = false;
+                }
+            }
+            else 
+            {
+                MessageBox.Show("Error, no se inserto la poliza correctamente");
+            }
+
+            connectionPolValida.Close();
+        }
+
+        return bExistePoliza;
+    }
+    catch (Exception ex)
+    {
+        MessageBox.Show("btnGeneraPoliza_Click " + ex.Message);
+        return bExistePoliza;
+    }
+}
+
+ private bool InsertarPolizaDetalle(int nPolPol, string cCueCon, decimal nDebPol, decimal nHabPol, int nIdxPol)
+ {
+     bool binsercionRegistro = false;
+
+     try
+     {
+         int nTipPol = 3;
+         string cConPol = "FACTURA " + txtFactura.Text;
+         string cFolFis = txtFolioFiscal.Text;
+
+         // Inserta póliza
+         using (OleDbConnection connectionPol = new OleDbConnection(strPolizaDiario))
+         {
+             connectionPol.Open();
+
+             string SQLPoliza = "INSERT INTO POLID2 (nPolPol, nTipPol, cConPol, cCueCon, nDebPol, nHabPol, nIdxPol, cFolFis) " +
+                                "VALUES (" + nPolPol + "," + nTipPol + ",'" + cConPol + "','" + cCueCon + "'," + nDebPol + "," + nHabPol + "," + nIdxPol + ",'" + cFolFis + "')";
+
+             OleDbCommand commandPoliza = new OleDbCommand(SQLPoliza, connectionPol);
+             commandPoliza.ExecuteNonQuery();
+
+             connectionPol.Close();
+         }
+
+         // Validar inserción
+         using (OleDbConnection connectionPolValida = new OleDbConnection(strPolizaDiario))
+         {
+             connectionPolValida.Open();
+
+             DataTable dtPoliza = new DataTable();
+             string SQLPoliza = "SELECT nPolPol, cConPol, cCueCon FROM POLID2 WHERE nPolPol = " + nPolPol +
+                                " AND cConPol = '" + cConPol + "' AND cCueCon = '" + cCueCon + "'";
+
+             OleDbCommand commandPoliza = new OleDbCommand(SQLPoliza, connectionPolValida);
+             OleDbDataReader readerPoliza = commandPoliza.ExecuteReader();
+
+             dtPoliza.Load(readerPoliza);
+
+             if (dtPoliza.Rows.Count > 0)
+             {
+                 binsercionRegistro = true;
+             }
+             connectionPolValida.Close();
+         }
+
+         return binsercionRegistro;
+     }
+     catch (Exception)
+     {
+         return binsercionRegistro;
+     }
+ }
