@@ -33,7 +33,7 @@ const poolUREA = new sql.ConnectionPool({
 const connectionString = "Driver={Microsoft Access Driver (*.mdb, *.accdb)};" +
 "DBQ=\\\\srv2kas\\Base Deposito Polizas\\PolizasDiarioLP.mdb;" +
 "PWD=a9TnX13HHOo;"; // Usa PWD para contraseña en ODBC // ¡AJUSTA ESTO!
-let accessConnection = null; // Usaremos una conexión directa en lugar de un poolss
+let accessConnection = null; // Usaremos una conexión directa en lugar de un pool
 
 async function connectToDatabases() {
     try {
